@@ -1,0 +1,8 @@
+'dependencyyang harus didownload ;
+
+streamlit
+pandas
+numpy
+plotly
+scikit-learn
+reportlab
