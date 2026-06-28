@@ -684,106 +684,213 @@ elif menu == "Analisis Karakteristik":
 # ==================================================
 elif menu == "Hasil Rekomendasi":
     hero("🔍", "Hasil Rekomendasi", "Input data pengguna → prediksi risiko + rekomendasi")
-
-    with st.form("predict_form"):
-        section_title("⏱️ Pola Penggunaan Harian")
-        u1, u2, u3, u4 = st.columns(4)
-        screen = u1.slider("Screen Time Harian (jam)", 0.0, 24.0, 5.0)
-        social = u2.slider("Media Sosial (jam)",       0.0, 24.0, 3.0)
-        gaming = u3.slider("Gaming (jam)",             0.0, 24.0, 2.0)
-        work   = u4.slider("Kerja / Belajar (jam)",    0.0, 24.0, 6.0)
-
-        u5, u6, u7, u8 = st.columns(4)
-        sleep   = u5.slider("Jam Tidur",                    0.0, 24.0, 7.0)
-        weekend = u6.slider("Screen Time Weekend (jam)",    0.0, 24.0, 6.0)
-        notif   = u7.number_input("Notifikasi / Hari",      0, 1000, 50)
-        opens   = u8.number_input("Buka Aplikasi / Hari",   0, 1000, 60)
-
-        submitted = st.form_submit_button("🚀 Predict Sekarang", type="primary")
-
-    if submitted:
-        inp = np.array([[screen, social, gaming, work, sleep, notif, opens, weekend]])
-        pred      = int(model.predict(inp)[0])
-        prob      = model.predict_proba(inp)[0]
-
-        st.session_state.last_pred = {
-            "inputs": {
-                "Screen Time Harian (jam)": screen,
-                "Media Sosial (jam)":       social,
-                "Gaming (jam)":             gaming,
-                "Kerja / Belajar (jam)":    work,
-                "Jam Tidur":                sleep,
-                "Screen Time Weekend (jam)":weekend,
-                "Notifikasi / Hari":        notif,
-                "Buka Aplikasi / Hari":     opens,
-            },
-            "pred":      pred,
-            "prob_low":  float(prob[0]) * 100,
-            "prob_high": float(prob[1]) * 100,
-            "timestamp": datetime.now(),
-        }
-
-    if "last_pred" in st.session_state:
-        res  = st.session_state.last_pred
-        pred = res["pred"]
-
-        banner_cls = "result-high" if pred == 1 else "result-low"
-        banner_txt = "⚠️ High Risk Addiction Detected" if pred == 1 else "✅ Low Risk — Penggunaan Tergolong Aman"
-        st.markdown(f'<div class="result-banner {banner_cls}">{banner_txt}</div>', unsafe_allow_html=True)
-
-        g1, g2 = st.columns([1, 1.4])
-
-        with g1:
-            fig_gauge = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=res["prob_high"],
-                number={"suffix": "%", "font": {"color": "#f8fafc"}},
-                gauge={
-                    "axis": {"range": [0,100], "tickcolor": "#6b7280"},
-                    "bar":  {"color": DANGER if pred==1 else SUCCESS},
-                    "bgcolor": "rgba(0,0,0,0)",
-                    "steps": [
-                        {"range": [0,50],  "color": "rgba(52,211,153,0.18)"},
-                        {"range": [50,100],"color": "rgba(248,113,113,0.18)"},
-                    ],
+ 
+    # ── tab: Manual vs Upload ──
+    tab1, tab2 = st.tabs(["👤 Prediksi Manual (1 orang)", "📂 Prediksi Massal (Upload Excel)"])
+ 
+    # =============================================
+    # TAB 1 — MANUAL
+    # =============================================
+    with tab1:
+        with st.form("predict_form"):
+            section_title("⏱️ Pola Penggunaan Harian")
+            u1, u2, u3, u4 = st.columns(4)
+            screen = u1.slider("Screen Time Harian (jam)", 0.0, 24.0, 5.0)
+            social = u2.slider("Media Sosial (jam)",       0.0, 24.0, 3.0)
+            gaming = u3.slider("Gaming (jam)",             0.0, 24.0, 2.0)
+            work   = u4.slider("Kerja / Belajar (jam)",    0.0, 24.0, 6.0)
+ 
+            u5, u6, u7, u8 = st.columns(4)
+            sleep   = u5.slider("Jam Tidur",                 0.0, 24.0, 7.0)
+            weekend = u6.slider("Screen Time Weekend (jam)", 0.0, 24.0, 6.0)
+            notif   = u7.number_input("Notifikasi / Hari",   0, 1000, 50)
+            opens   = u8.number_input("Buka Aplikasi / Hari",0, 1000, 60)
+ 
+            submitted = st.form_submit_button("🚀 Predict Sekarang", type="primary")
+ 
+        if submitted:
+            inp  = np.array([[screen, social, gaming, work, sleep, notif, opens, weekend]])
+            pred = int(model.predict(inp)[0])
+            prob = model.predict_proba(inp)[0]
+ 
+            st.session_state.last_pred = {
+                "inputs": {
+                    "Screen Time Harian (jam)":  screen,
+                    "Media Sosial (jam)":         social,
+                    "Gaming (jam)":               gaming,
+                    "Kerja / Belajar (jam)":      work,
+                    "Jam Tidur":                  sleep,
+                    "Screen Time Weekend (jam)":  weekend,
+                    "Notifikasi / Hari":          notif,
+                    "Buka Aplikasi / Hari":       opens,
                 },
-                title={"text": "High Risk Probability", "font": {"color": "#9ca3af","size":13}},
-            ))
-            fig_gauge.update_layout(**PLOTLY_LAYOUT, height=280)
-            chart_wrap(fig_gauge)
-
-        with g2:
-            section_title("Probability Breakdown")
-            st.markdown(f"**Low Risk:** {res['prob_low']:.1f}%")
-            st.progress(res['prob_low'] / 100)
-            st.markdown(f"**High Risk:** {res['prob_high']:.1f}%")
-            st.progress(res['prob_high'] / 100)
-
-            section_title("Data yang Dimasukkan")
-            in_df = pd.DataFrame({"Field": res["inputs"].keys(), "Nilai": res["inputs"].values()})
-            st.dataframe(in_df, hide_index=True, use_container_width=True)
-
-        section_title("💡 Rekomendasi")
-        if pred == 1:
-            recs = [
+                "pred":      pred,
+                "prob_low":  float(prob[0]) * 100,
+                "prob_high": float(prob[1]) * 100,
+                "timestamp": datetime.now(),
+            }
+ 
+        if "last_pred" in st.session_state:
+            res  = st.session_state.last_pred
+            pred = res["pred"]
+ 
+            banner_cls = "result-high" if pred == 1 else "result-low"
+            banner_txt = ("⚠️ High Risk Addiction Detected" if pred == 1
+                          else "✅ Low Risk — Penggunaan Tergolong Aman")
+            st.markdown(f'<div class="result-banner {banner_cls}">{banner_txt}</div>',
+                        unsafe_allow_html=True)
+ 
+            g1, g2 = st.columns([1, 1.4])
+            with g1:
+                fig_gauge = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=res["prob_high"],
+                    number={"suffix": "%", "font": {"color": "#f8fafc"}},
+                    gauge={
+                        "axis": {"range": [0,100], "tickcolor": "#6b7280"},
+                        "bar":  {"color": DANGER if pred==1 else SUCCESS},
+                        "bgcolor": "rgba(0,0,0,0)",
+                        "steps": [
+                            {"range": [0,50],  "color": "rgba(52,211,153,0.18)"},
+                            {"range": [50,100],"color": "rgba(248,113,113,0.18)"},
+                        ],
+                    },
+                    title={"text": "High Risk Probability", "font": {"color": "#9ca3af","size":13}},
+                ))
+                fig_gauge.update_layout(**PLOTLY_LAYOUT, height=280)
+                chart_wrap(fig_gauge)
+ 
+            with g2:
+                section_title("Probability Breakdown")
+                st.markdown(f"**Low Risk:** {res['prob_low']:.1f}%")
+                st.progress(res["prob_low"] / 100)
+                st.markdown(f"**High Risk:** {res['prob_high']:.1f}%")
+                st.progress(res["prob_high"] / 100)
+ 
+                section_title("Data yang Dimasukkan")
+                in_df = pd.DataFrame({"Field": res["inputs"].keys(),
+                                      "Nilai": res["inputs"].values()})
+                st.dataframe(in_df, hide_index=True, use_container_width=True)
+ 
+            section_title("💡 Rekomendasi")
+            recs_high = [
                 ("📵", "Batasi screen time harian maksimal 4 jam di luar jam kerja/belajar."),
                 ("🌙", "Usahakan tidur minimal 7–8 jam per malam; hindari HP 1 jam sebelum tidur."),
                 ("📲", "Kurangi notifikasi aktif — matikan notif yang tidak penting."),
                 ("⚽", "Ganti waktu main HP dengan aktivitas fisik atau hobi offline."),
-                ("🧘", "Pertimbangkan digital detox minimal 1 hari per minggu, terutama saat weekend."),
+                ("🧘", "Pertimbangkan digital detox minimal 1 hari per minggu."),
             ]
-        else:
-            recs = [
+            recs_low = [
                 ("✅", "Pola penggunaan smartphonemu sudah tergolong sehat — pertahankan!"),
                 ("⏰", "Tetap jaga screen time harian agar tidak merangkak naik."),
                 ("😴", "Konsistensi tidur yang baik adalah kunci — jaga jam tidurmu."),
                 ("🔕", "Sesekali coba mode DND (Do Not Disturb) saat fokus belajar/kerja."),
             ]
-        for icon, text in recs:
-            st.markdown(f"""
-            <div class="insight-card" style="margin-bottom:8px">
-            {icon} {text}
-            </div>""", unsafe_allow_html=True)
+            for icon, text in (recs_high if pred == 1 else recs_low):
+                st.markdown(f'''<div class="insight-card" style="margin-bottom:8px">
+                {icon} {text}</div>''', unsafe_allow_html=True)
+ 
+    # =============================================
+    # TAB 2 — BATCH / UPLOAD EXCEL
+    # =============================================
+    with tab2:
+        section_title("📂 Upload File Excel")
+ 
+        # Template download
+        st.markdown("""
+        <div class="insight-card">
+        Upload file <b>Excel (.xlsx)</b> dengan kolom sesuai format di bawah.
+        Setiap baris = 1 orang. Klik tombol <b>Download Template</b> jika belum punya formatnya.
+        </div>
+        """, unsafe_allow_html=True)
+ 
+        # Buat template Excel
+        template_df = pd.DataFrame(columns=FEATURES)
+        template_df.loc[0] = [5.0, 3.0, 2.0, 6.0, 7.0, 50, 60, 6.0]   # contoh baris
+        template_df.loc[1] = [10.0, 6.0, 4.0, 3.0, 5.0, 120, 150, 12.0]
+ 
+        buf_tmpl = io.BytesIO()
+        template_df.to_excel(buf_tmpl, index=False)
+        buf_tmpl.seek(0)
+ 
+        st.download_button(
+            "📥 Download Template Excel",
+            data=buf_tmpl,
+            file_name="template_prediksi.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+ 
+        uploaded = st.file_uploader("Upload file Excel kamu di sini", type=["xlsx","xls"])
+ 
+        if uploaded is not None:
+            try:
+                up_df = pd.read_excel(uploaded)
+ 
+                # Validasi kolom
+                missing_cols = [f for f in FEATURES if f not in up_df.columns]
+                if missing_cols:
+                    st.error(f"❌ Kolom berikut tidak ditemukan di file: {missing_cols}")
+                    st.info("Pastikan nama kolom sama persis dengan template. Gunakan tombol Download Template di atas.")
+                else:
+                    batch_df = up_df[FEATURES].copy().fillna(0)
+ 
+                    # Prediksi semua baris
+                    preds = model.predict(batch_df)
+                    probs = model.predict_proba(batch_df)
+ 
+                    batch_df["Prediksi"]        = ["High Risk ⚠️" if p==1 else "Low Risk ✅" for p in preds]
+                    batch_df["Prob. Low Risk"]  = [f"{p[0]*100:.1f}%" for p in probs]
+                    batch_df["Prob. High Risk"] = [f"{p[1]*100:.1f}%" for p in probs]
+                    batch_df["Rekomendasi"]     = [
+                        "Segera kurangi screen time & perbaiki pola tidur."
+                        if p==1 else "Pertahankan pola penggunaan yang sehat."
+                        for p in preds
+                    ]
+                    batch_df.columns = (
+                        [FEATURE_LABELS[f] for f in FEATURES] +
+                        ["Prediksi", "Prob. Low Risk", "Prob. High Risk", "Rekomendasi"]
+                    )
+                    batch_df.insert(0, "No", range(1, len(batch_df)+1))
+ 
+                    # Ringkasan
+                    n_high = int(sum(preds == 1))
+                    n_low  = int(sum(preds == 0))
+                    n_tot  = len(preds)
+                    section_title("📊 Ringkasan Hasil")
+                    c1, c2, c3 = st.columns(3)
+                    with c1: kpi_card("👥", "Total Data", f"{n_tot}")
+                    with c2: kpi_card("⚠️", "High Risk", f"{n_high} orang ({n_high/n_tot*100:.1f}%)")
+                    with c3: kpi_card("✅", "Low Risk",  f"{n_low} orang ({n_low/n_tot*100:.1f}%)")
+ 
+                    # Pie ringkasan
+                    fig_b = px.pie(
+                        names=["High Risk","Low Risk"], values=[n_high, n_low],
+                        color_discrete_sequence=[DANGER, SUCCESS], hole=0.5,
+                    )
+                    fig_b.update_layout(**PLOTLY_LAYOUT, showlegend=True)
+                    chart_wrap(fig_b)
+ 
+                    section_title("📋 Tabel Hasil Prediksi")
+                    st.dataframe(batch_df, use_container_width=True, hide_index=True)
+ 
+                    # Download hasil Excel
+                    buf_out = io.BytesIO()
+                    batch_df.to_excel(buf_out, index=False)
+                    buf_out.seek(0)
+ 
+                    st.download_button(
+                        "📥 Download Hasil Prediksi (.xlsx)",
+                        data=buf_out,
+                        file_name=f"hasil_prediksi_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        type="primary",
+                    )
+ 
+                    st.session_state.last_batch = batch_df
+ 
+            except Exception as e:
+                st.error(f"❌ Gagal membaca file: {e}")
+ 
 
 # ==================================================
 # 9. DOWNLOAD HASIL
